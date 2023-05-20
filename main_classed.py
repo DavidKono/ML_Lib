@@ -21,13 +21,13 @@ print("y_train shape:", y_train.shape)
 
 
 def train():
-    gradient_descent_classed.input(x_train)
+    gradient_descent_classed.input(x_train, y_train)
 
-    gradient_descent_classed.add(gradient_descent_classed.leaky_relu, 256)
-    gradient_descent_classed.add(gradient_descent_classed.leaky_relu, 128)
-    gradient_descent_classed.add(gradient_descent_classed.leaky_relu, 128)
+    gradient_descent_classed.add(gradient_descent_classed.layer.leaky_relu, 256)
+    gradient_descent_classed.add(gradient_descent_classed.layer.leaky_relu, 128)
+    gradient_descent_classed.add(gradient_descent_classed.layer.leaky_relu, 128)
 
-    gradient_descent_classed.add(gradient_descent_classed.softmax, 10)
+    gradient_descent_classed.add(gradient_descent_classed.layer.softmax, 10)
 
     gradient_descent_classed.sgd(10, 1024, 0.005)
 

@@ -92,7 +92,7 @@ def train():
         hidden_1_bias_grad_total = np.zeros((hidden_1_size,))
 
         #random batch
-        batch_size = 128
+        batch_size = 1785
         rand_list = np.random.choice(range(0, 60000), size=batch_size, replace=False)
 
         prob_total = 0
