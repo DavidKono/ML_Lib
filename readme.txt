@@ -54,4 +54,4 @@ sgd
 -misc
 early_stop(max_subsequent_decreases)
 learn_rate_anneal()    - halves learn rate when test accuracy decreases
-check_annealing(max_subsequent_decreases)   - experimental feature to load an modify learn rate as accuracy decreases
+check_annealing(max_subsequent_decreases)   - experimental feature to load and modify learn rate as accuracy decreases

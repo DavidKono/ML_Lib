@@ -4,7 +4,7 @@ import numpy as np
 x_train = np.load('x_train.npy')
 y_train = np.load('y_train.npy')
 x_test = np.load('x_test.npy')
-y_test = np.load('y_test.npy')
+y_test = np.load('y_test.npy') 
 
 # Print the shape of the data
 print("X_train shape:", x_train.shape)
@@ -21,7 +21,7 @@ def train():
 
     #ML_lib.early_stop(1)
     #ML_lib.learn_rate_anneal()
-    #ML_lib.check_annealing(3)
+    #ML_lib.check_annealing(1)
 
     ML_lib.sgd(10, 2000, 0.005)
 

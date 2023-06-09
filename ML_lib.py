@@ -2,7 +2,6 @@ import numpy as np
 import pickle
 import time
 
-
 class checks:
     def __init__(self):
         #bool for check
@@ -20,7 +19,7 @@ class checks:
         self.test_accuracy = 0
         self.last_test_accuracy = 0
 
-checks_table = checks()
+global_truths = checks()
 
 #this class is used with input() function, which creates L[0], a list of all the input layers. L[0].output is called to get the i'th input layer in the list
 #should also include label data in this
@@ -112,7 +111,8 @@ class layer:
             return self.relu_deriv
         if activ_func == layer.sigmoid:
             return self.sigmoid_deriv
-        
+
+
 
 L = []
 #L[0] seperate because it doesnt have weighted sum, etc
@@ -121,6 +121,45 @@ def input(image_array_list, labels_list):
 
 def add(activ_func, size):
     L.append(layer(activ_func, size, L[len(L) - 1].length))
+
+H = []
+def test_input(x_test, y_test):
+    H.append(input_layers(x_test, y_test))
+
+
+
+
+def forward_prop(num_layers):
+    for m in range(1, num_layers):
+        L[m].weighted = L[m].weights_and_biases(L[m-1].output) 
+        L[m].output = L[m].activate(L[m].weighted)
+
+def back_prop(image_no, learn_rate):
+    num_layers = len(L)
+
+    #output L[num_layers-1] is the first layer done, it has different calcs
+    #zero hot array for delta
+    actual_probabality = np.zeros((L[0].labels_length))
+    actual_probabality[int(L[0].label[image_no])] = 1
+    L[num_layers-1].delta = L[num_layers-1].output - actual_probabality
+
+    L[num_layers-1].bias_grad = learn_rate * L[num_layers-1].delta
+    L[num_layers-1].weights_grad = learn_rate * np.outer(L[num_layers-2].output, L[num_layers-1].delta)
+
+    #then from second last layer
+    m = num_layers - 2
+    while m > 0 : 
+        L[m].delta = L[m].deriv(L[m].weighted) * np.dot(L[m+1].delta, L[m+1].weights.T)
+        L[m].bias_grad = learn_rate * L[m].delta 
+        L[m].weights_grad = learn_rate * np.outer(L[m-1].output, L[m].delta) #+ (1/85000 * L[m].weights) + (1/60000 * np.square(L[m].weights))
+        
+        m -= 1
+
+    for m in range(1, num_layers):
+        L[m].weights -= L[m].weights_grad
+        L[m].biases -= L[m].bias_grad
+
+
 
 
 def sgd(epochs, batch_size, learn_rate):
@@ -148,103 +187,91 @@ def sgd(epochs, batch_size, learn_rate):
             expected_prob_total += expected_prob
 
         #backprop
-            #output L[num_layers-1] is the first layer done, it has different calcs
-            #zero hot array for delta
-            actual_probabality = np.zeros((L[0].labels_length))
-            actual_probabality[int(L[0].label[image_no])] = 1
-            L[num_layers-1].delta = L[num_layers-1].output - actual_probabality
+            back_prop(image_no, learn_rate)
+            
+        #print
+        global_truths.train_accuracy = expected_prob_total/batch_size
+        print("Epoch:", h + 1, "Accuracy:", global_truths.train_accuracy, "Cost:", cost_total/batch_size)
 
-            L[num_layers-1].bias_grad = learn_rate * L[num_layers-1].delta
-            L[num_layers-1].weights_grad = learn_rate * np.outer(L[num_layers-2].output, L[num_layers-1].delta)
-
-            #then from second last layer
-            m = num_layers - 2
-            while m > 0 : 
-                L[m].delta = L[m].deriv(L[m].weighted) * np.dot(L[m+1].delta, L[m+1].weights.T)
-                L[m].bias_grad = learn_rate * L[m].delta 
-                L[m].weights_grad = learn_rate * np.outer(L[m-1].output, L[m].delta) #+ (1/85000 * L[m].weights) + (1/60000 * np.square(L[m].weights))
-                
-                m -= 1
-
-            for m in range(1, num_layers):
-                L[m].weights -= L[m].weights_grad
-                L[m].biases -= L[m].bias_grad
-
-        train_acc = expected_prob_total/batch_size
-        print("Epoch:", h + 1, "Accuracy:", train_acc, "Cost:", cost_total/batch_size)
-
-    #early stop
-        if checks_table.check_loss == 1:
-            checks_table.test_accuracy = test()
-            action = decreases_function(checks_table.test_accuracy, checks_table.last_test_accuracy) 
-            if action == 1:
-                print("test accuracy has gone down; early stopping")
-                exit(0)
-            if action == 0:
-                checks_table.last_test_accuracy = checks_table.test_accuracy
-                save_model()
-        
-    #learn rate annealing
-        if checks_table.learn_rate_annealing == 1:
-            checks_table.test_accuracy = test()
-            action = decreases_function(checks_table.test_accuracy, checks_table.last_test_accuracy)
-            checks_table.last_test_accuracy = checks_table.test_accuracy
-            if action == 1:
-                print("test accuracy has gone down; reducing learn rate")
-                learn_rate = learn_rate/2
-
-    #test of both
-        if checks_table.check_loss_annealing == 1:
-            checks_table.train_accuracy = train_acc
-            action = decreases_function(checks_table.train_accuracy, checks_table.last_train_accuracy)
-            if action == 1:
-                print("train accuracy has gone down; loading back and reducing learn rate")
-                learn_rate = learn_rate/2
-                load_back()
-            if action == 0:
-                checks_table.last_train_accuracy = checks_table.train_accuracy
-                save_model()
+        perform_early_stop_or_anneal(learn_rate)
             
         end_time = time.time()
         epoch_time = int((end_time - start_time) * 1000)
         print("Time taken this epoch = ", epoch_time, " ms")
         print("")
 
+
+def perform_early_stop_or_anneal(learn_rate):
+    #early stop
+        if global_truths.check_loss == 1:
+            early_stop_action()  
+        
+    #learn rate annealing
+        if global_truths.learn_rate_annealing == 1:
+            learn_rate_anneal_action(learn_rate)
+            
+    #test of both
+        if global_truths.check_loss_annealing == 1:
+            check_annealing_action(learn_rate)
+
 def decreases_function(this_accuracy, last_accuracy):
     #if accuracy gone up, save
     if this_accuracy > last_accuracy:
-        checks_table.subsequent_decreases = 0
-
+        global_truths.subsequent_decreases = 0
         return 0
-
+    
     #else if gone down, increase subsequent decreases
     else:
-        checks_table.subsequent_decreases += 1
+        global_truths.subsequent_decreases += 1
         #if has exceeded max decreases, activate
-        if checks_table.subsequent_decreases >= checks_table.max_decreases:
-            checks_table.subsequent_decreases = 0
+        if global_truths.subsequent_decreases >= global_truths.max_decreases:
+            global_truths.subsequent_decreases = 0
             return 1
         
         return 2
     
-#these can all be checked using test_data or training accuracy data
 def check_annealing(max_subsequent_losses):
-    checks_table.check_loss_annealing = 1
-    checks_table.max_decreases = max_subsequent_losses
+    global_truths.check_loss_annealing = 1
+    global_truths.max_decreases = max_subsequent_losses
+
+def check_annealing_action(learn_rate):   
+    action = decreases_function(global_truths.train_accuracy, global_truths.last_train_accuracy)
+    if action == 1:
+        print("train accuracy has gone down; loading back and reducing learn rate")
+        learn_rate = learn_rate/2
+        load_back()
+    if action == 0:
+        global_truths.last_train_accuracy = global_truths.train_accuracy
+        save_model()
 
 def learn_rate_anneal():
-    checks_table.learn_rate_annealing = 1
+    global_truths.learn_rate_annealing = 1
+
+def learn_rate_anneal_action(learn_rate):
+    global_truths.test_accuracy = test()
+    action = decreases_function(global_truths.test_accuracy, global_truths.last_test_accuracy)
+    global_truths.last_test_accuracy = global_truths.test_accuracy
+    if action == 1:
+        print("test accuracy has gone down; reducing learn rate")
+        learn_rate = learn_rate/2
             
 def early_stop(max_subsequent_losses):
-    checks_table.check_loss = 1
-    checks_table.max_decreases = max_subsequent_losses
+    global_truths.check_loss = 1
+    global_truths.max_decreases = max_subsequent_losses
 
-H = []
-def test_input(x_test, y_test):
-    H.append(input_layers(x_test, y_test))
+def early_stop_action():
+    global_truths.test_accuracy = test()
+    action = decreases_function(global_truths.test_accuracy, global_truths.last_test_accuracy) 
+    if action == 1:
+        print("test accuracy has gone down; early stopping")
+        exit(0)
+    if action == 0:
+        global_truths.last_test_accuracy = global_truths.test_accuracy
+        save_model()
+
+
 
 def test():
-
     expected_prob_total = 0
     cost_total = 0 
     
@@ -270,11 +297,6 @@ def test():
 
     print("Test Accuracy:", expected_prob_total/batch_size, "Test Cost:", cost_total/batch_size)
     return expected_prob_total/batch_size
-
-def forward_prop(num_layers):
-    for m in range(1, num_layers):
-        L[m].weighted = L[m].weights_and_biases(L[m-1].output) 
-        L[m].output = L[m].activate(L[m].weighted)
 
 def save_model():
     for i in range(1, len(L)):
